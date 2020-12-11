@@ -20,17 +20,8 @@
 //! assert_eq!(vec, [6, 12]);
 //! ```
 //!
-//! ## `VecDeque`
-//!
-//! ```
-//! # use retain_mut::RetainMut;
-//! # use std::collections::VecDeque;
-//! let mut deque = VecDeque::from(vec![1, 2, 3, 4]);
-//! deque.retain_mut(|x| { *x *= 3; *x % 2 == 0 });
-//! assert_eq!(deque, [6, 12]);
-//! ```
 
-use std::collections::VecDeque;
+
 
 /// Trait that provides `retain_mut` method.
 pub trait RetainMut<T> {
@@ -42,7 +33,12 @@ pub trait RetainMut<T> {
     fn retain_mut<F>(&mut self, f: F)
     where
         F: FnMut(&mut T) -> bool;
+
+    fn retain_mut_unordered<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut T) -> bool;
 }
+
 
 impl<T> RetainMut<T> for Vec<T> {
     // The implementation is based on
@@ -68,26 +64,31 @@ impl<T> RetainMut<T> for Vec<T> {
             self.truncate(len - del);
         }
     }
-}
 
-impl<T> RetainMut<T> for VecDeque<T> {
-    // The implementation is based on
-    // https://github.com/rust-lang/rust/blob/0eb878d2aa6e3a1cb315f3f328681b26bb4bffdb/src/liballoc/collections/vec_deque.rs#L1978-L1995
-    fn retain_mut<F>(&mut self, mut f: F)
+    
+    fn retain_mut_unordered<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut T) -> bool,
     {
         let len = self.len();
-        let mut del = 0;
-        for i in 0..len {
-            if !f(&mut self[i]) {
-                del += 1;
-            } else if del > 0 {
-                self.swap(i - del, i);
+        let mut del = len-1;
+        {
+            let v = &mut **self;
+
+            let mut cursor=0;
+            for _ in 0..len {
+                if !f(&mut v[cursor]) {
+                    v.swap(cursor,del);
+                    del-=1;
+                    
+                }else{
+                    cursor+=1;
+                }
             }
         }
-        if del > 0 {
-            self.truncate(len - del);
+        if del != len-1 {
+            self.truncate(del);
         }
     }
 }
+
